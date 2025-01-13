@@ -1,68 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Section from './components/Section';
 import Modal from './components/Modal';
 import logo from './image.png';
+import axios from 'axios';
 
 function App() {
   const [prompts, setPrompts] = useState({
-    teamPrompts: [
-      {
-        id: "1",
-        text: "Prompts for Documentation",
-        description: "Detailed information about documentation.",
-        prompt: "Create documentation titled [title] with the following details: [details].",
-        sections: [
-          {
-            key: "title",
-            label: "Documentation Title",
-            placeholder: "Enter the title of the documentation",
-            example: "API Integration Guide",
-            input: "",
-            size: "small",
-          },
-          {
-            key: "details",
-            label: "Documentation Body",
-            placeholder: "Enter the main content",
-            example: "This guide explains how to integrate the payment API...",
-            input: "",
-            size: "large",
-          },
-        ],
-      },
-      {
-        id: "2",
-        text: "Debugging Guide for problems with our stack",
-        description: "Steps and tips for team debugging.",
-        prompt: "To debug, describe the bug: [bug_description], steps to reproduce: [reproduction_steps], and proposed solution: [solution].",
-        sections: [
-          {
-            key: "bug_description",
-            label: "Bug Description",
-            placeholder: "Describe the bug",
-            example: "The application crashes when uploading a file.",
-            input: "",
-            size: "small",
-          },
-          {
-            key: "reproduction_steps",
-            label: "Steps to Reproduce",
-            placeholder: "List steps to reproduce the bug",
-            example: "1. Open the application\n2. Upload a file\n3. Observe crash",
-            input: "",
-            size: "large",
-          },
-          {
-            key: "solution",
-            label: "Proposed Solution",
-            placeholder: "Suggest a fix or workaround",
-            example: "Check file upload handler for null references.",
-            input: "",
-            size: "small",
-          },
-        ],
-      },
-    ],
+    teamPrompts: [],
     developerPrompts: [],
     organizationPrompts: [],
     nonTechnicalTasks: [],
@@ -77,7 +21,23 @@ function App() {
     sections: [],
   });
 
-  // Handle input changes for modal sections
+  // Fetch teamPrompts from the backend
+  useEffect(() => {
+    const fetchPrompts = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/teamPrompts');
+        setPrompts((prev) => ({
+          ...prev,
+          teamPrompts: response.data,
+        }));
+      } catch (err) {
+        console.error('Error fetching prompts:', err);
+      }
+    };
+
+    fetchPrompts();
+  }, []);
+
   const handleInputChange = (promptId, sectionKey, value) => {
     setPrompts((prev) => {
       const updatedPrompts = { ...prev };
@@ -97,7 +57,6 @@ function App() {
       return updatedPrompts;
     });
 
-    // Update modal content to reflect changes immediately
     setModalContent((prev) => ({
       ...prev,
       sections: prev.sections.map((section) =>
@@ -106,7 +65,6 @@ function App() {
     }));
   };
 
-  // Open the modal with the selected prompt data
   const handleCopyPrompt = (promptId, promptText, description, promptTemplate, sections) => {
     console.log("Opening modal with the following data:");
     console.log("Prompt ID:", promptId);
@@ -120,12 +78,11 @@ function App() {
       id: promptId,
       title: promptText,
       description,
-      prompt: promptTemplate, // Use the correct prompt template
-      sections: sections || [], // Default to an empty array if undefined
+      prompt: promptTemplate,
+      sections: sections || [], 
     });
   };
 
-  // Close the modal
   const handleCloseModal = () => {
     setModalContent({
       isOpen: false,
@@ -224,7 +181,7 @@ function App() {
                 id,
                 text,
                 desc,
-                selectedPrompt.prompt, // Pass the correct prompt
+                selectedPrompt.prompt,
                 selectedPrompt.sections
               );
             }
