@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Section from './components/Section';
 import Modal from './components/Modal';
+import AddPromptModal from './components/AddPromptModal'; // Modal for adding new prompts
 import logo from './image.png';
 import axios from 'axios';
 
@@ -21,14 +22,33 @@ function App() {
     sections: [],
   });
 
+  const [isAddPromptModalOpen, setIsAddPromptModalOpen] = useState(false);
+
+  // Standardize prompt format
+  const standardizePromptFormat = (prompt) => ({
+    id: prompt.id || `${Date.now()}`,
+    text: prompt.text || "",
+    description: prompt.description || "",
+    prompt: prompt.prompt || "",
+    sections: prompt.sections?.map((section) => ({
+      key: section.key || "",
+      label: section.label || "",
+      placeholder: section.placeholder || "",
+      example: section.example || "",
+      input: section.input || "",
+      size: section.size || "small",
+    })) || [],
+  });
+
   // Fetch teamPrompts from the backend
   useEffect(() => {
     const fetchPrompts = async () => {
       try {
         const response = await axios.get('http://localhost:5000/api/teamPrompts');
+        const standardizedPrompts = response.data.map(standardizePromptFormat);
         setPrompts((prev) => ({
           ...prev,
-          teamPrompts: response.data,
+          teamPrompts: standardizedPrompts,
         }));
       } catch (err) {
         console.error('Error fetching prompts:', err);
@@ -66,20 +86,13 @@ function App() {
   };
 
   const handleCopyPrompt = (promptId, promptText, description, promptTemplate, sections) => {
-    console.log("Opening modal with the following data:");
-    console.log("Prompt ID:", promptId);
-    console.log("Prompt Text:", promptText);
-    console.log("Description:", description);
-    console.log("Template:", promptTemplate);
-    console.log("Sections:", sections);
-
     setModalContent({
       isOpen: true,
       id: promptId,
       title: promptText,
       description,
       prompt: promptTemplate,
-      sections: sections || [], 
+      sections: sections || [],
     });
   };
 
@@ -94,58 +107,32 @@ function App() {
     });
   };
 
-  // Combine inputs and copy all to clipboard
   const handleCopyAll = () => {
     let combinedPrompt = modalContent.prompt;
-
-    // Log the modal content and sections for debugging
-    console.log("Modal Content:", modalContent);
-    console.log("Sections to combine:", modalContent.sections);
-
-    // Replace placeholders in the prompt template with inputs
     modalContent.sections.forEach((section) => {
       const replacement = section.input || section.placeholder;
       combinedPrompt = combinedPrompt.replace(`[${section.key}]`, replacement);
-      console.log(`Replacing [${section.key}] with:`, replacement);
     });
 
-    // Log the final combined prompt
-    console.log("Final Combined Prompt:", combinedPrompt);
-
-    // Copy the final combined prompt to the clipboard
     navigator.clipboard
       .writeText(combinedPrompt)
-      .then(() => {
-        alert("Prompt copied to clipboard:\n\n" + combinedPrompt);
-      })
-      .catch((err) => {
-        console.error("Error copying prompt:", err);
-      });
+      .then(() => alert("Prompt copied to clipboard!"))
+      .catch((err) => console.error("Error copying prompt:", err));
   };
 
-  const handleAddNewPrompt = (section) => {
-    const newPromptText = prompt("Enter a new prompt:");
-    if (newPromptText) {
-      const newPrompt = {
-        id: `${Date.now() + Math.floor(Math.random() * 101)}`,
-        text: newPromptText,
-        description: "Default description for the new prompt.",
-        prompt: "New prompt template [key].",
-        sections: [
-          {
-            key: "key",
-            label: "Input Field",
-            placeholder: "Enter input",
-            example: "Example input",
-            input: "",
-          },
-        ],
-      };
-
+  const handleAddNewPrompt = async (newPrompt) => {
+    try {
+      const standardizedPrompt = standardizePromptFormat(newPrompt);
+      const response = await axios.post('http://localhost:5000/api/teamPrompts', standardizedPrompt, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      console.log('Prompt added successfully:', response.data);
       setPrompts((prev) => ({
         ...prev,
-        [section]: [...prev[section], newPrompt],
+        teamPrompts: [...prev.teamPrompts, response.data],
       }));
+    } catch (error) {
+      console.error('Error adding new prompt:', error.response || error.message);
     }
   };
 
@@ -157,13 +144,6 @@ function App() {
             <img src={logo} alt="Prompter Logo" className="h-8" />
             <span className="text-xl font-bold text-gray-800">Prompter</span>
           </div>
-          <div className="flex-1 max-w-lg mx-4">
-            <input
-              type="text"
-              placeholder="Search for a prompt"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring focus:ring-blue-200"
-            />
-          </div>
         </div>
       </header>
 
@@ -174,7 +154,6 @@ function App() {
           route="/popup"
           onCopy={(id, text, desc, promptTemplate) => {
             const selectedPrompt = prompts.teamPrompts.find((prompt) => prompt.id === id);
-            console.log("Selected prompt for modal:", selectedPrompt);
 
             if (selectedPrompt) {
               handleCopyPrompt(
@@ -186,7 +165,7 @@ function App() {
               );
             }
           }}
-          onAdd={() => handleAddNewPrompt("teamPrompts")}
+          onAdd={() => setIsAddPromptModalOpen(true)}
         />
       </main>
 
@@ -198,6 +177,12 @@ function App() {
         sections={modalContent.sections}
         onInputChange={(key, value) => handleInputChange(modalContent.id, key, value)}
         onCopy={handleCopyAll}
+      />
+
+      <AddPromptModal
+        isOpen={isAddPromptModalOpen}
+        onClose={() => setIsAddPromptModalOpen(false)}
+        onSave={handleAddNewPrompt}
       />
     </div>
   );
